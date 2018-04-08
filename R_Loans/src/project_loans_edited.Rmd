@@ -1,0 +1,612 @@
+#Loan analysis by Alona Sukretna
+========================================================
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+# Load all of the packages that using in analysis in this code chunk.
+
+# Notice that the parameter "echo" was set to FALSE for this code chunk. This
+# prevents the code from displaying in the knitted HTML output. You should set
+# echo=FALSE for all code chunks in your file, unless it makes sense for your
+# report to show the code that generated a particular plot.
+
+# The other parameters for "message" and "warning" should also be set to FALSE
+# for other code chunks once you have verified that each plot comes out as you
+# want it to. This will clean up the flow of your report.
+
+# Plotting
+library(ggplot2)
+# Scaling for plots 
+library(scales)
+# Filtering and grouping
+library(dplyr)
+# Scatterplot matrices
+library(GGally)
+# Date manipulation
+library(lubridate)
+# Tabulate modules
+library(memisc)
+#Formatting plots
+library(grid)
+library(gridExtra)
+```
+
+```{r echo=FALSE, Load_the_Data}
+# Load the Data
+mydata <- read.csv(file="prosperLoanData.csv", header=TRUE)
+```
+**Data set:** I choose Loan Data from Prosper 
+(https://s3.amazonaws.com/udacity-hosted-downloads/ud651/prosperLoanData.csv).
+This data set contains 113,937 loans with 81 variables on each loan,
+including loan amount, borrower rate (or interest rate), current loan status,
+borrower income, borrower employment status, borrower credit history, 
+and the latest payment information.
+
+# Univariate Plots Section
+**Preliminary exploration of dataset**: There are a lot of NA data in our dataset,
+but there is reasons why data is empty. For example, different stage of loans, 
+applied methodics and so on. So, we'll be doing data cleaning if needed during 
+our exploration.
+
+First, let's explore main parameteres for loans, e.g. amount, term, current status.
+
+###1. Loan Original Amount
+```{r echo=FALSE, LoanOriginalAmount}
+summary(mydata$LoanOriginalAmount)
+```
+We have loans in our data set that starts from $1000 up to $35,000.
+The average loan amount is $8,337.
+
+```{r echo=FALSE, LoanOriginalAmountPlot}
+ggplot(data=mydata, aes(LoanOriginalAmount))+
+         geom_histogram(binwidth = 700)+
+         scale_x_continuous(breaks=seq(0, 26000,2000), limits=c(0,26000))
+```
+
+```{r echo=FALSE, LoanAmountSummary}
+ summary(mydata$LoanOriginalAmount)
+```
+
+We can see that the largest count of loans for $4,000. Also we have a few peak 
+counts for $2,000, $3,000, $5,000, $10,000, $15,000, $20,000, $25,000.
+Probably, the greateast count of $4000 loans is due to different procedures and 
+requirements for larger amounts.
+There is a few loans larger $25,000 but for more clear view we can exclude them
+from our plot.
+The mean loan amount is $8337.
+
+###2.Loan Term
+
+```{r echo=FALSE, LoanTermPlot}
+#converting to factor data
+mydata$Term<-factor(mydata$Term)
+
+ggplot(data=mydata, aes(Term))+
+         geom_bar()
+```
+
+Most loans are for 36 months(3 years), less for 60 months(5 years),
+and the least for 12 moths.
+
+###3.Loan Current Status
+
+```{r echo=FALSE, LoanCurrentStatusPlot}
+ggplot(data=mydata, aes(LoanStatus))+
+          geom_bar()+
+          theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+Obviously, the most loans are in Current status. There are a lot of Completed 
+loans in our data set. A big count of loans are Chargeoff (no payments for 6 
+month, unlikely to be collected) and Defaulted. Past Due loans have own gradation.
+Tere is small count of such loans but I prefer not exclude them from analysis 
+because they connected with further analyzed parameters.
+
+```{r echo=FALSE, LoanCurrentStatusTable}
+table(mydata$LoanStatus)
+```
+
+###4. Aim of the loan(Listing Category)
+
+The category of the listing that the borrower selected when posting their listing:
+0 - Not Available, 1 - Debt Consolidation, 2 - Home Improvement, 3 - Business,
+4 - Personal Loan, 5 - Student Use, 6 - Auto, 7- Other, 8 - Baby&Adoption, 
+9 - Boat, 10 - Cosmetic Procedure, 11 - Engagement Ring, 12 - Green Loans,
+13 - Household Expenses, 14 - Large Purchases, 15 - Medical/Dental,
+16 - Motorcycle, 17 - RV, 18 - Taxes, 19 - Vacation, 20 - Wedding Loans.
+
+```{r echo=FALSE, Aim_of_the_loan(ListingCategory)}
+ggplot(data=mydata, aes(ListingCategory..numeric.))+
+  geom_bar(show.legend=TRUE)+
+  scale_x_continuous(breaks = c(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20))
+```
+
+The most loans are for Debt Consolidation. For big count of loans information
+not available or not in listed categories ('others').
+
+###5.Loan Origination Date
+It's in format "3/3/2014  12:00:00 AM", we don't need time for analysis.
+
+```{r echo=FALSE, new_variable_for_Loan_Origination_Date}
+#create new variable for date without time
+mydata$LoanDate<-substr(as.character(mydata$LoanOriginationDate),1,7)
+#date format
+mydata$LoanDate<-as.Date(paste(mydata$LoanDate,"-01", sep=""))
+#plot
+ggplot(mydata, aes(LoanDate))+
+  geom_bar()
+```
+
+We can see that we have data from the end of 2005 to the 2014.
+Company loans grows for this period with a few ups and downs and 1 gap around 
+2009. This gap can be explained that company has changed it's business model
+at that time(2008 'quiet period' and 2009 SEC registration according to Wikipedia)
+
+###6. ProsperRating..numeric. 
+
+```{r echo=FALSE, LoanProsperRating..numericPlot}
+ggplot(data=mydata, aes(ProsperRating..numeric.))+
+         geom_bar()+
+         scale_x_discrete(limits=c("HR","E","D","C","B","A","AA"))
+```
+
+We have most loans with average ProsperRating and less with the highest and lowest
+ratings.
+
+###7. CreditScoreRangeLower
+
+We have two indicators of Credit Score:CreditScoreRangeLower and CreditScoreRangeUpper.
+I plot it together to see the difference.
+
+```{r echo=FALSE, CreditScoreRangeLowerPlot}
+ggplot(data=mydata, aes(x=CreditScoreRangeLower, fill = "red",
+                                    alpha = 0.2))+
+         geom_histogram()+ 
+         scale_x_continuous(breaks=seq(400,950,100), limits=c(400,950)) +
+        geom_histogram(data=mydata, aes(x=CreditScoreRangeUpper, fill = "blue",
+                                        alpha = 0.2))+
+   scale_fill_discrete(name="Credit Scores", labels=c("Lower", "Upper"))+
+   labs(x = "Credit Scores")
+   
+ 
+```
+```{r echo=FALSE, CreditScoreRangeLowerBoxPlot}
+grid.arrange(ggplot(aes(x=1, y=CreditScoreRangeLower), 
+        data = mydata) +
+   geom_boxplot( ), 
+   ggplot(aes(x=1, y=CreditScoreRangeUpper), 
+        data = mydata) +
+   geom_boxplot( ), nrow=1)
+  
+```
+
+I change scale because there was an outlier around 0. And there is a few outliers
+more than 750 and less than 640.
+
+For further analysis we'll use CreditScoreRangeLower, because it's a minimum 
+acceptable value that mentioned in Prosper rules.
+Or alternatively we can create additional value that is average of lower and 
+upper scores.
+
+The plot shows that in average credit scores veries from 640 to 750 and further
+in most loans. This align with rule that was implemewnted by Prosper in 2009 that
+minimum Credit Score required to be 640. This also explain small amount of loans
+with credit score lower 600, that for sure was isuued before 2009 and lead to 
+revision of rules.
+
+
+###8. Estimated Loss
+Estimated loss is the estimated principal loss on charge-offs. 
+This parameter is applicable for loans originated after July 2009.
+
+```{r echo=FALSE, EstimatedLossPlot}
+grid.arrange(ggplot(mydata, aes(EstimatedLoss))+
+  geom_histogram()+
+  scale_x_continuous(breaks=pretty_breaks(n=10), limits=c(0,0.2)),
+ggplot(aes(x=1, y=EstimatedLoss), 
+        data = mydata) +
+  geom_boxplot( ), nrow =1)
+         
+```
+ 
+Based on numbers I think it's not EstimatedLoss amount, but EstimatedLoss Rate 
+(which is not obvious from Variable Definition that comes with data).
+We have a few loans with EstimatedLoss larger than 0.3, so we can eliminate them 
+to see other data more clear. Also I wanted to see which loans has bigger
+EstimatedLoss. According to our plot and summary statistics(below) we can see 
+that the biggest number of loans have EstimatedLoss around 0.06.
+
+```{r echo=FALSE, EstimatedLossSummary}
+ summary(mydata$EstimatedLoss)
+```
+
+Based on summary statistics we can see that the average loss is 0.08. Maximum loss
+is 0.336, but this data is outlier, so it's rather exception.
+
+###9. Borrower Rate
+
+```{r echo=FALSE, BorrowerRatePlot}
+grid.arrange( ggplot(mydata, aes(BorrowerRate))+
+  geom_histogram()+
+  scale_x_continuous(breaks=pretty_breaks(n=10), limits=c(0,0.4)),
+ggplot(aes(x=1, y=BorrowerRate), 
+        data = mydata) +
+  geom_boxplot( ), nrow =1)
+         
+```
+
+```{r echo=FALSE, BorrowerRateSummary}
+ summary(mydata$BorrowerRate)
+```
+
+Based on plots and summary we can see that average borrower rate is 0.19. Peak at
+rate 0.31-0.32. I think is for not reliable loans with bad scores and around 0.15
+for reliable loans with good scores.
+There is a few outliers with Borrower Rate more than 0.4. It's rather exceptions,
+so we can exclude them from analysis.
+
+
+###10. Borrower APR
+
+```{r echo=FALSE, BorrowerAPRPlot}
+grid.arrange( ggplot(aes(x=BorrowerAPR), 
+        data = mydata) +
+  geom_histogram( bins = 30) ,
+   ggplot(aes(x=1, y=BorrowerAPR), 
+        data = mydata) +
+  geom_boxplot( )  , nrow =1)
+         
+```
+```{r echo=FALSE, Borrower_Rate_Summary}
+ summary(mydata$BorrowerRate)
+```
+
+Borrower APR( Borrower's Annual Percentage Rate) is in range between 0 and 0.4975.
+The most popular APR is around 0.2, mean is 0.1928. There is a few outliers 
+in APR more than 0.4, and we can exclude them from further analysis.
+
+# Univariate Analysis
+
+ **Summarizing data**: 
+
+We have big data set with loan data from Prosper from the end of  2005 to 2014. 
+It's quite representative data set with lot of variables.
+We don't need it all for analysis, but better to have more, than less. 
+I'll make needed changes in the dataset during my investigtion. For example,
+I created new variable for loan date without time for analysing loan history.
+
+We are interested in loan distribution by year, quality, usage to see all changes.
+We need to find what are the factors that influence the most on loan quantity
+and quality.
+
+Also I analyzed a few parameters that I'll use in further analysis: Prosper Rating,
+Credit Score, Estimated Loss and Borrower Rate.
+
+Besides analyzed paramateres, also would be interesting to see geography  of loan
+distribution (by BorrowerState), characteristic of people using Prosper
+(occupation, income), monthly payments.
+
+
+
+# Bivariate Plots Section
+
+> **Choosing variables might be interesting to look**: 
+Based on our data set and what we saw in the univariate plots, let's choose some 
+variables for bivariate analysis. 
+First, we will look on correlation between parameters. The matrix is so big that
+I preffer not to show it in html.
+
+```{r echo=FALSE, Bivariate_Plots_correlation, results="hide"}
+#numeric columns
+#sapply(mydata, is.numeric)
+#use boolean vector to subset and get just the numeric columns
+numeric_columns<-mydata[, sapply(mydata, is.numeric)]
+#correlation matrix
+res <- cor(numeric_columns, use = "complete.obs", method = "pearson")
+round(res, 2)
+#getOption("max.print") limited output of correlation matrix in html, it's big
+#options(max.print=500)
+```
+
+We can see significant correlation(positive or negative) between BorrowerRate,
+LenderYield, EstimatedLoss, ProsperRating..numeric, Prosper Score,
+Credit Score(Lower and Upper) and APR. 
+This is logical because different credit ratings and scores should be comparable
+to each other. And the worst rating is the bigger will be estimated loss. 
+Also obviously big enough correlation between Loan Amount and Monthly Payment.
+This matrix is too big. Let's see this parameters more closely.
+
+###1. Prosper Rating vs Credit Score.
+
+```{r echo=FALSE, Bivariate_Plots_cortest}
+cor.test(mydata$ProsperRating..numeric.,mydata$CreditScoreRangeLower)
+
+```
+
+According to Wikipedia:"Since its SEC registration in 2009, Prosper has provided
+a proprietary "**Prosper Rating**" for prospective borrowers based on the
+company's estimation of that borrower's "estimated loss rate." According to the 
+company, that figure is "determined by two scores: (1) the **credit score**,
+obtained from an official credit reporting agency, and (2) the **Prosper Score**, 
+figured in-house based on the Prosper population." Prosper Ratings, from
+lowest-risk to highest-risk, are labeled AA, A, B, C, D, E, and HR ("High Risk")."
+
+```{r echo=FALSE, Bivariate_Plots1}
+p1<-boxplot(CreditScoreRangeLower~factor(ProsperRating..numeric.), data=mydata, 
+        col = c("pink", "blue"),  xlab = "ProsperRating",  ylab = "CreditScoreRangeLower")
+p1       
+```
+
+This boxplot shows the relationship between borrower's Prosper rating
+(after July 2009) and CreditScore(Lower). CreditScore is a part of Prosper Rating 
+along with Prosper Score. The higher Rating (7 is the highest) the higher 
+should be Credit Score. Just for rating 1 and 2 we have some exclusions.
+
+
+```{r echo=FALSE, Bivariate_Plots_summary}
+#by(mydata$CreditScoreRangeLower,mydata$ProsperRating..numeric., summary)
+```
+
+Notes:
+**CreditScoreRangeLower**	The lower value representing the range of the 
+borrower's credit score as provided by a consumer credit rating agency.
+CreditScoreRangeUpper	The upper value representing the range of the borrower's
+credit score as provided by a consumer credit rating agency. 
+I used lower level for calculations but we also can create mean CreditScore from
+Lower and Upper.
+
+**ProsperRating (numeric)**	The  Prosper Rating assigned at the time the listing
+was created: 0 - N/A, 1 - HR, 2 - E, 3 - D, 4 - C, 5 - B, 6 - A, 7 - AA.
+Applicable for loans originated **after July 2009**.
+ProsperRating (Alpha)	The Prosper Rating assigned at the time the listing was
+created between AA - HR.  Applicable for loans originated after July 2009.
+
+Our findings align with information from wikipedia, that 
+" New prospective borrowers were required to have
+an FICO 8 credit score of at least 640."
+
+###2. Prosper rating	vs Estimated Loss
+
+```{r echo=FALSE, Bivariate_Plots_cor}
+cor.test(mydata$ProsperRating..numeric.,mydata$EstimatedLoss)
+
+```
+
+Negative correlation,  one variable increases as the other decreases.
+
+```{r echo=FALSE, Bivariate_Plots_2_boxplot}
+p2<-boxplot(EstimatedLoss~factor(ProsperRating..numeric.), data=mydata, 
+        col = c("pink", "blue"),  ylim = c(0, 0.2), xlab = "ProsperRating",
+         ylab = "EstimatedLoss")
+p2
+```
+
+```{r echo=FALSE, Bivariate_Plots_summary2}
+#by(mydata$EstimatedLoss,mydata$ProsperRating..numeric., summary)
+```
+
+For the worst Rating (1) EstimatedLoss will be the most sufficient.
+
+###3. Prosper Rating vs Loan Amount
+
+```{r echo=FALSE, Bivariate_Plots_cor_test}
+cor.test(mydata$ProsperRating..numeric.,mydata$LoanOriginalAmount)
+
+```
+
+Correlation is not so strong.
+
+```{r echo=FALSE, Bivariate_Plots3}
+ggplot(data = mydata, aes(x=ProsperRating..numeric., y=LoanOriginalAmount))+
+         geom_jitter(aes(color=ProsperRating..numeric.), width = 0.3, height = 0.3)+
+         scale_x_discrete(limits=c("HR","E","D","C","B","A","AA"))+
+         scale_color_continuous(high='red',low='blue')
+
+```
+
+This plot is overplotted so I use a boxplot for the same parameters.
+
+```{r echo=FALSE, Bivariate_Plots_2}
+p3<-boxplot(LoanOriginalAmount~factor(ProsperRating..numeric.), data=mydata, 
+        col = c("pink", "blue"), xlab = "ProsperRating",
+         ylab = "Loan Amount",
+         ylim = c(0, 25000) )
+p3
+```
+
+I set some limits for the big amount ouliers because it's rather exceptions.
+Loans with high ammount of money has higher ratings, that's mean less risky.
+High risk loans (HR Rating - 1) are loans for small amounts of money(up tp $10,000).
+
+
+
+
+
+# Bivariate Analysis
+
+In this section I analize how Prosper Rating (this characteristic was created by Prosper)
+connected with Credit Score, EstimatedLoss and Loan Amount.
+The strongest negative correlation is between Prosper Rating
+and Estimated Loss. It's obvious that the better raiting the less loss. Also it's 
+closely related with Credit Score, which is part of Prosper Rating calculating.
+And there is enough dependency between Prosper Rating and Loan Amount, because bigger 
+loans give only for reliable clients. Also this rating should be strongly connected with 
+Borrower Rate and Borrower APR.
+There is also strong relationship between term and loan amount: longer term,
+bigger amount.
+
+
+
+# Multivariate Plots Section
+
+In previous section we found thar Prosper Rating connected with
+Credit Score, Estimated Loss, Loan Amount and Borrower Rate, APR.
+Let's continue our investigations.
+
+```{r echo=FALSE, Multivariate_Plots1}
+#subset NA values for ProsperRAting
+#we have missing data for Cancelled, ChargedOff, Completed and 
+#Defaulted loans. Probably, for such loans rating not calculated.
+#Let's use cleaned data:
+
+mydata1<-subset(mydata, !is.na(ProsperRating..numeric.))
+
+#ggplot(aes(x=EstimatedLoss, y=CreditScoreRangeLower, 
+# color=factor(ProsperRating..numeric.)), data=mydata1)+
+#geom_jitter()+ylim(550,900)+scale_color_brewer(type = 'seq', palette = 'YlGnBu')+
+ #theme_gray(base_size = 14)
+
+  
+ggplot(mydata1, aes(x=EstimatedLoss, y=CreditScoreRangeLower, 
+                    fill=factor(ProsperRating..numeric.), colour=factor(ProsperRating..numeric.))) +
+#  geom_point() +
+  geom_boxplot(alpha=0.6)
+
+```
+
+Here we can see again that low Prosper rating(1) leads to bigger Estimatedloss while 
+CreditScore sometimes can be high but have  bad Prosper Rating and
+high loss. This is one of the reasons, I think, that Prosper use their own rating,
+in which Credit Score is just part of the calculation.
+just one part of calculation.
+
+
+```{r echo=FALSE, Multivariate_Plots2}
+#subset NA values for ProsperRAting
+mydata1<-subset(mydata, !is.na(ProsperRating..numeric.))
+
+p<-ggplot(aes(x=LoanOriginalAmount, y=BorrowerRate,
+       color=factor((ProsperRating..numeric.))),
+       data=mydata1,  na.rm = TRUE)+
+  geom_jitter()+ stat_ellipse()+scale_color_brewer(type = 'seq', palette = 'YlGnBu')+
+  theme_gray(base_size = 14)
+p
+```
+
+Here we see that borrower rate higher for loans with "bad" ratings. Big loans
+have low Borrower rate and high ratings(5-7), while small loans(up to $10000) have all 
+range of rates and ratings. Grey dots is missing data for Prosper Rating.
+Let's see if there is dependency from Loan Status.
+
+```{r echo=FALSE, Multivariate_Plots3}
+ggplot(aes(x=LoanOriginalAmount, y=BorrowerRate,
+       color=factor((ProsperRating..numeric.))),
+       data=mydata1,  na.rm = TRUE)+
+  geom_jitter()+scale_color_brewer(type = 'seq', palette = 'YlGnBu')+
+  theme_gray(base_size = 14)+facet_wrap(~LoanStatus)
+```
+
+Rate, Rating and Amount don't depend on Loan Status. With amount it's
+obvious, because it fixed. Probably, Borrower Rate and Rating is fixed also from the
+moment of loan approval. In other practicies borrower's credit rating can go down for 
+past due. 
+
+
+
+# Multivariate Analysis
+
+In this part of the investigation we confirm findings from Bivariate analysis 
+and find a few new facts. For example, that Borrower Rate higher for loans with
+"bad" ratings and low for "good ratings", but for loans up to $10000 it has all 
+range of rates and ratings. This can testify that small amount of money can be 
+given for different clients on different conditions, even with low Credit Ratings
+considering other factors (monthly income, homeowner, etc). 
+Also we found that low Prosper rating lead to bigger loss while Credit
+Score Lower Range sometimes can be pretty high for such loans. 
+This is one of the reasons, I think, that Prosper use their own rating.
+And we found that there is no dependency between Loan Rate, Prosper Rating and 
+Loan status, what means that they fixed and don't change when loan is past due.
+
+
+
+
+# Final Plots and Summary
+
+
+### Plot One
+
+```{r echo=FALSE, Plot_One}
+boxplot(LoanOriginalAmount~factor(ProsperRating..numeric.), data=mydata, 
+        col = c("pink", "blue"), xlab = "ProsperRating",
+         ylab = "Loan Amount, $",
+         ylim = c(0, 25000) , main="Prosper Rating vs Loan Amount")
+
+```
+
+
+### Description One
+
+This  plot shows how Prosper rating connected with Loan Amount.
+Loans with high ammount of money has higher ratings, that's mean less risky.
+High risk loans (HR Rating - 1) are loans for small amounts of money
+(mostly up to $4,000) with some ouliers.
+
+Also we have the same plots for Credit Score and Estimated Loss.
+
+
+### Plot Two
+
+```{r echo=FALSE, Plot_Two}
+mydata1<-subset(mydata, !is.na(ProsperRating..numeric.))
+  
+ggplot(mydata1, aes(x=EstimatedLoss, y=CreditScoreRangeLower, 
+                    fill=factor(ProsperRating..numeric.), colour=factor(ProsperRating..numeric.))) +
+  geom_boxplot(alpha=0.6)+
+  ggtitle("Distribution of Prosper Rating based on Credit Score and Estimated Loss")+
+  labs(x = "EstimatedLoss(Rate)")
+  
+```
+
+### Description Two
+This plot I choose because it shows that Credit Score, that provided by credit 
+rating agencies is not enough to prognose losses, that's why, probably, it was one 
+of the factor why Prosper choose to use their own rating, which based on Credit Score.
+
+### Plot Three
+
+```{r echo=FALSE, Plot_Three}
+mydata1<-subset(mydata, !is.na(ProsperRating..numeric.))
+
+p<-ggplot(aes(x=LoanOriginalAmount, y=BorrowerRate,
+       color=factor((ProsperRating..numeric.))),
+       data=mydata1,  na.rm = TRUE)+
+  geom_jitter()+ stat_ellipse()+scale_color_brewer(type = 'seq', palette = 'YlGnBu')+
+  theme_gray(base_size = 14)+
+       ggtitle("Distribution of ProsperRating by BorrowerRate and LoanAmount")+
+       labs(x = "Loan Amount, $")
+p
+```
+
+### Description Three
+I choose this plot because it shows that big loans only with good ratings and good rates.
+But as for smaller amounts rule still is, but it can vary sometimes and depend on other
+factors.
+
+
+# Reflection
+
+Prosper loan data is pretty big data set with various parameters that represents
+data from the end of 2005 to the 2014. One of the problems was dertermining which 
+variables to analyze, how to find and deal with missing data and
+not drifting too far off any one path. I started by understanding the individual
+variables in the data set, and then I explored in more details Prosper Rating, that 
+was created by this company, and parameteres that closely connected with it(based on 
+correlation and rules of rating's calculation). 
+Other problem for big data set is overplotting.
+As I  make observations on plots I made conclusion that Prosper decide to use their
+own rating because ratings from third companies are not enough to prognose losses.
+It's also proved by historical data when  Prosper had to relaunch after negative return
+and and implement stricter credit guidelines for borrowers in July 2009. 
+Due to this fact my investigation limited by that fact that Prosper Rating is 
+applicable for loans originated after July 2009.
+There are a lot more things that we can investigate beased on this dataset.  
+For example, we can compare some loan characteristic before and after new rules 
+implementation. We could confirm that Prosper's loan default rate has been 
+significantly reduced and the percentage of all loans that are 6+ months old,
+and are 1+ month late, dropped to less than 4% (according to Wikipedia). 
+It would be interesting to build a predictive model that quantifies if the person 
+is going to default on their loan. We could use, for example, a logistic regression. 
+
+
