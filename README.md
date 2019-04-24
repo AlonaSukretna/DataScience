@@ -1,2 +1,2 @@
 # DataScience
-Data Science repo contains my projects for Udacity Nanodegree
+Data Science repo contains my projects 
